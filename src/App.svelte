@@ -15,11 +15,15 @@
 
     try {
       console.log("Loading recipe.tsv...");
-      const recipeRows = await loadTSVPapa(`/recipe.tsv?v=${Date.now()}`);
+      const recipeRows = await loadTSVPapa(
+        import.meta.env.BASE_URL + `recipe.tsv?v=${Date.now()}`,
+      );
       console.log("recipeRows:", recipeRows);
 
       console.log("Loading plants.tsv...");
-      const plantRows = await loadTSVPapa(`/plants.tsv?v=${Date.now()}`);
+      const plantRows = await loadTSVPapa(
+        import.meta.env.BASE_URL + `plants.tsv?v=${Date.now()}`,
+      );
       console.log("plantRows:", plantRows);
 
       recipes = mergeRecipeData(recipeRows, plantRows);
