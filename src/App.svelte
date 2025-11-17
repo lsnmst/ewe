@@ -98,6 +98,16 @@
           </button>
         </div>
       {/each}
+      <br /><br />
+      <p style="font-size:0.9rem;">
+        <u>Sources:</u><br /><br />Verger, Pierre Fatumbi (1995). Ewé: o uso das
+        plantas na sociedade iorubá<br />Wande Abimbola (1977). Awon Odu Ifá<br
+        />Bolaji Idowu (1962). Olódùmarè: God in Yoruba Belief<br />Henry &
+        Margaret Drewal (1983). Gelede: Art and Female Power among the Yoruba<br
+        />R.C. Abraham (1958). Dictionary of Modern Yoruba<br />Oyekan Owomoyela
+        (2005). Yoruba Proverbs<br />Teresa N. Washington (2005). Our Mothers,
+        Our Powers, Our Texts.
+      </p>
     </div>
 
     <!-- MAP AREA -->
