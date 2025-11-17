@@ -5,6 +5,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "dev": "vite",
     "build": "vite build",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
@@ -18,6 +19,7 @@
   },
   "dependencies": {
     "leaflet": "^1.9.4",
+    "leaflet-minimap": "^3.6.1",
     "papaparse": "^5.5.3"
   }
 }
