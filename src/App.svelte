@@ -21,10 +21,6 @@
   are located in the cosmoscape, building a new perspective from outside
   or complementary to Western ethnobotany.`;
 
-  $: description = descriptionExpanded
-    ? fullDescription
-    : fullDescription.substring(0, 120) + "...";
-
   const IUCN_MAP = {
     VU: "Vulnerable",
     EN: "Endangered",
@@ -122,10 +118,8 @@
         class:expanded={descriptionExpanded}
         on:click={() => (descriptionExpanded = !descriptionExpanded)}
       >
-        {description}
-        <span class="expand-hint">
-          {#if descriptionExpanded}[less]{:else}[more]{/if}
-        </span>
+        {fullDescription}
+        <span class="expand-hint"></span>
       </p>
       <hr />
       <h3>Formulae</h3>
@@ -290,18 +284,9 @@
   }
 
   .description {
-    display: block;
-    cursor: default;
+    /* desktop: show full text */
     overflow: visible;
-    -webkit-line-clamp: unset; /* full content by default */
-  }
-
-  .expand-hint {
-    display: none; /* hide on desktop */
-    font-weight: bold;
-    color: rgb(218, 154, 154);
-    margin-left: 2px;
-    cursor: pointer;
+    cursor: default;
   }
 
   /* Mobile layout only */
@@ -347,21 +332,27 @@
     }
 
     .description {
+      display: -webkit-box;
+      -webkit-line-clamp: 3; /* truncated on mobile */
+      -webkit-box-orient: vertical;
       overflow: hidden;
       text-overflow: ellipsis;
-      display: -webkit-box;
-      -webkit-line-clamp: 3; /* truncated by default */
-      -webkit-box-orient: vertical;
-      line-height: 1.2rem;
       cursor: pointer;
     }
 
     .description.expanded {
-      -webkit-line-clamp: unset; /* expanded fully */
+      -webkit-line-clamp: unset; /* expanded state shows full content */
     }
 
-    .expand-hint {
-      display: inline; /* visible only on mobile */
+    .expand-hint::after {
+      content: "[more]";
+      font-weight: bold;
+      color: rgb(218, 154, 154);
+      margin-left: 2px;
+    }
+
+    .description.expanded .expand-hint::after {
+      content: "[less]";
     }
   }
 </style>
