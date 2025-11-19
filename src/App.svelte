@@ -11,6 +11,49 @@
   let error = null;
   let searchQuery = ""; // <-- search query
 
+  let descriptionExpanded = false;
+
+  const fullDescription = `The Yoruba cosmoscape is a symbolic cartography where Òrìṣà, energetic
+  fields, and sacred habitats are arranged. In this mapped cosmology,
+  plant-beings are situated as spatial actors who relate through their
+  spiritual affiliation, ritual function, and traditional ecological
+  domain/knowledge. Explore the formulae and notice where the plants
+  are located in the cosmoscape, building a new perspective from outside
+  or complementary to Western ethnobotany.`;
+
+  $: description = descriptionExpanded
+    ? fullDescription
+    : fullDescription.substring(0, 120) + "...";
+
+  const IUCN_MAP = {
+    VU: "Vulnerable",
+    EN: "Endangered",
+    CR: "Critically Endangered",
+    NT: "Near Threatened",
+    LC: "Least Concern",
+  };
+
+  function getRawIUCN(details) {
+    if (!details) return null;
+
+    // Try all possible typo variants
+    const candidates = [
+      details.IUCN,
+      details["IUCN "],
+      details[" IUCN"],
+      details["IUCN  "],
+    ];
+
+    let raw = candidates.find((v) => v && v.trim() !== "");
+    return raw ? raw.trim() : null;
+  }
+
+  function getPrettyIUCN(details) {
+    const raw = getRawIUCN(details);
+    if (!raw) return null;
+    return IUCN_MAP[raw] ?? raw;
+  }
+
   onMount(async () => {
     try {
       const recipeRows = await loadTSVPapa(
@@ -74,14 +117,15 @@
     <!-- SIDEBAR -->
     <div class="sidebar">
       <h2 id="title">Cosmoscape of the Yoruba plants</h2>
-      <p>
-        The Yoruba cosmoscape is a symbolic cartography where Òrìṣà, energetic
-        fields, and sacred habitats are arranged. In this mapped cosmology,
-        plant-beings are situated as spatial actors who relate through their
-        spiritual affiliation, ritual function, and traditional ecological
-        domain/knowledge.<br />Explore the formulae and notice where the plants
-        are located in the cosmoscape, building a new perspective from outside
-        or complementary to Western ethnobotany.
+      <p
+        class="description"
+        class:expanded={descriptionExpanded}
+        on:click={() => (descriptionExpanded = !descriptionExpanded)}
+      >
+        {description}
+        <span class="expand-hint">
+          {#if descriptionExpanded}[less]{:else}[more]{/if}
+        </span>
       </p>
       <hr />
       <h3>Formulae</h3>
@@ -120,12 +164,27 @@
           <p>{selectedRecipe.recipe_EN}</p>
           {#each selectedRecipe.plantDetails as p}
             <div class="plant-card" on:click={() => selectPlant(p)}>
-              <h4><u>{p.ewe_name}</u></h4>
+              <h4 style="margin-block-end: 5px !important;">
+                <u>{p.ewe_name}</u>
+              </h4>
+              <span class="botanical">{p.botanical_name}</span>
               {#if p.details}
                 <p><b>Energetic Polarity:</b> {p.details.EP}</p>
                 <p><b>Ritual Function:</b> {p.details.ritual_function}</p>
-                <hr />
-                <b>{p.details.ifa_prescription}</b>
+                {#if p.details}
+                  {#if getPrettyIUCN(p.details)}
+                    <p
+                      style="padding:4px; border: 1px #262626 solid; padding:5px;border-radius:2px;"
+                    >
+                      Identified in the IUCN Red List as
+                      <b>{getPrettyIUCN(p.details)}</b>
+                    </p>
+                  {/if}
+                {/if}
+                <span
+                  style="background-color:rgb(218,154,154); padding:5px;border-radius:2px;line-height:2.2rem"
+                  >Θ {p.details.ifa_prescription}</span
+                >
               {:else}
                 <p>No plant details found.</p>
               {/if}
@@ -225,6 +284,26 @@
     -webkit-text-fill-color: #262626;
   }
 
+  .botanical {
+    font-family: serif;
+    font-style: italic;
+  }
+
+  .description {
+    display: block;
+    cursor: default;
+    overflow: visible;
+    -webkit-line-clamp: unset; /* full content by default */
+  }
+
+  .expand-hint {
+    display: none; /* hide on desktop */
+    font-weight: bold;
+    color: rgb(218, 154, 154);
+    margin-left: 2px;
+    cursor: pointer;
+  }
+
   /* Mobile layout only */
   @media (max-width: 768px) {
     .app-container {
@@ -259,11 +338,30 @@
       box-sizing: border-box;
       height: 30%;
       left: 0px !important;
+      background-color: rgb(218, 154, 154);
     }
 
     .plant-card {
       display: inline-block; /* horizontal cards */
       margin-right: 8px;
+    }
+
+    .description {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 3; /* truncated by default */
+      -webkit-box-orient: vertical;
+      line-height: 1.2rem;
+      cursor: pointer;
+    }
+
+    .description.expanded {
+      -webkit-line-clamp: unset; /* expanded fully */
+    }
+
+    .expand-hint {
+      display: inline; /* visible only on mobile */
     }
   }
 </style>
