@@ -33,9 +33,13 @@
 
   const highlightIcon = L.divIcon({
     className: "custom-marker",
-    html: `<svg width="28" height="28" viewBox="0 0 28 28">
-            <circle cx="14" cy="14" r="10" fill="#da9a9a" stroke="#fff" stroke-width="2"/>
-           </svg>`,
+    html: `
+      <svg width="32" height="32" viewBox="0 0 32 32">
+      <circle cx="16" cy="16" r="12" fill="#da9a9a" stroke="#fff" stroke-width="2"/>
+      <line x1="10" y1="10" x2="22" y2="22" stroke="#262626" stroke-width="3" stroke-linecap="round"/>
+      <line x1="22" y1="10" x2="10" y2="22" stroke="#262626" stroke-width="3" stroke-linecap="round"/>
+      </svg>           
+    `,
     iconSize: [28, 28],
     iconAnchor: [14, 14],
   });
@@ -67,11 +71,6 @@
         markersMap.set(key, marker);
       } else {
         marker.setIcon(isHighlighted ? highlightIcon : normalIcon);
-      }
-
-      if (isHighlighted && highlightArray.length === 1) {
-        marker.openPopup();
-        map.setView([lat, lng], map.getZoom(), { animate: true });
       }
     });
   }

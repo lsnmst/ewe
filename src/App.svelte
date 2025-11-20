@@ -9,9 +9,10 @@
   let selectedRecipe = null;
   let loading = true;
   let error = null;
-  let searchQuery = ""; // <-- search query
 
-  let descriptionExpanded = false;
+  let searchQuery = "";
+
+  let showMobileInfo = false;
 
   const fullDescription = `The Yoruba cosmoscape is a symbolic cartography where Òrìṣà, energetic
   fields, and sacred habitats are arranged. In this mapped cosmology,
@@ -31,15 +32,12 @@
 
   function getRawIUCN(details) {
     if (!details) return null;
-
-    // Try all possible typo variants
     const candidates = [
       details.IUCN,
       details["IUCN "],
       details[" IUCN"],
       details["IUCN  "],
     ];
-
     let raw = candidates.find((v) => v && v.trim() !== "");
     return raw ? raw.trim() : null;
   }
@@ -67,7 +65,6 @@
     }
   });
 
-  // Filter recipes and plants by search query
   $: filteredRecipes = recipes.filter((r) => {
     const q = searchQuery.toLowerCase();
     const recipeNameMatch =
@@ -101,7 +98,6 @@
   <p style="color:red">{error}</p>
 {:else}
   <div class="app-container">
-    <!-- SEARCH BAR -->
     <div class="search-bar">
       <input
         type="text"
@@ -110,18 +106,24 @@
       />
     </div>
 
-    <!-- SIDEBAR -->
     <div class="sidebar">
-      <h2 id="title">Cosmoscape of the Yoruba plants</h2>
-      <p
-        class="description"
-        class:expanded={descriptionExpanded}
-        on:click={() => (descriptionExpanded = !descriptionExpanded)}
-      >
+      <div class="title-row">
+        <h2 id="title">Cosmoscape of the Yoruba plants</h2>
+
+        <span
+          class="info-button"
+          on:click={() => (showMobileInfo = !showMobileInfo)}
+        >
+          ⓘ
+        </span>
+      </div>
+
+      <p class="description" class:show-mobile={showMobileInfo}>
         {fullDescription}
-        <span class="expand-hint"></span>
       </p>
+
       <hr />
+
       <h3>Formulae</h3>
       {#each filteredRecipes as recipe}
         <div class="recipe-item">
@@ -131,20 +133,22 @@
             on:click={() => selectRecipe(recipe)}
           >
             <h3>{recipe.recipe_name}</h3>
-            <h5>{recipe.odu}</h5>
-            <p>{recipe.recipe}</p>
+            <h5 class="onlymobile">{recipe.odu}</h5>
+            <p class="onlymobile">{recipe.recipe}</p>
           </button>
         </div>
       {/each}
+
       <br /><br />
       <p style="font-size:0.9rem;">
-        <u>Sources:</u><br /><br />Verger, Pierre Fatumbi (1995). Ewé: o uso das
-        plantas na sociedade iorubá<br />Wande Abimbola (1977). Awon Odu Ifá<br
-        />Bolaji Idowu (1962). Olódùmarè: God in Yoruba Belief<br />Henry &
-        Margaret Drewal (1983). Gelede: Art and Female Power among the Yoruba<br
-        />R.C. Abraham (1958). Dictionary of Modern Yoruba<br />Oyekan Owomoyela
-        (2005). Yoruba Proverbs<br />Teresa N. Washington (2005). Our Mothers,
-        Our Powers, Our Texts.
+        <u>Sources:</u><br /><br />
+        Verger, Pierre Fatumbi (1995). Ewé: o uso das plantas na sociedade iorubá
+        <br />Wande Abimbola (1977). Awon Odu Ifá <br />Bolaji Idowu (1962).
+        Olódùmarè: God in Yoruba Belief <br />Henry & Margaret Drewal (1983).
+        Gelede: Art and Female Power among the Yoruba <br />R.C. Abraham (1958).
+        Dictionary of Modern Yoruba <br />Oyekan Owomoyela (2005). Yoruba
+        Proverbs <br />Teresa N. Washington (2005). Our Mothers, Our Powers, Our
+        Texts.
       </p>
     </div>
 
@@ -154,31 +158,40 @@
 
       {#if selectedRecipe}
         <div class="plant-panel">
+          <button
+            class="close-plant-panel"
+            on:click={() => (selectedRecipe = null)}
+          >
+            ×
+          </button>
           <h3>{selectedRecipe.EN_recipe_name}</h3>
           <p>{selectedRecipe.recipe_EN}</p>
+
           {#each selectedRecipe.plantDetails as p}
             <div class="plant-card" on:click={() => selectPlant(p)}>
               <h4 style="margin-block-end: 5px !important;">
                 <u>{p.ewe_name}</u>
               </h4>
               <span class="botanical">{p.botanical_name}</span>
+
               {#if p.details}
                 <p><b>Energetic Polarity:</b> {p.details.EP}</p>
                 <p><b>Ritual Function:</b> {p.details.ritual_function}</p>
-                {#if p.details}
-                  {#if getPrettyIUCN(p.details)}
-                    <p
-                      style="padding:4px; border: 1px #262626 solid; padding:5px;border-radius:2px;"
-                    >
-                      Identified in the IUCN Red List as
-                      <b>{getPrettyIUCN(p.details)}</b>
-                    </p>
-                  {/if}
+
+                {#if getPrettyIUCN(p.details)}
+                  <p
+                    style="padding:4px; border:1px #262626 solid; padding:5px;border-radius:2px;"
+                  >
+                    Identified in the IUCN Red List as
+                    <b>{getPrettyIUCN(p.details)}</b>
+                  </p>
                 {/if}
+
                 <span
                   style="background-color:rgb(218,154,154); padding:5px;border-radius:2px;line-height:2.2rem"
-                  >Θ {p.details.ifa_prescription}</span
                 >
+                  Θ {p.details.ifa_prescription}
+                </span>
               {:else}
                 <p>No plant details found.</p>
               {/if}
@@ -226,6 +239,25 @@
   .map-area {
     flex: 1;
     position: relative;
+  }
+
+  .close-plant-panel {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: none;
+    border: none;
+    font-size: 1.6rem;
+    font-weight: bold;
+    color: #262626;
+    cursor: pointer;
+    z-index: 99999;
+    line-height: 1rem;
+    padding: 0;
+  }
+
+  .close-plant-panel:hover {
+    color: rgb(218, 154, 154);
   }
 
   .plant-panel {
@@ -276,6 +308,8 @@
   #title {
     font-size: 1.8rem;
     -webkit-text-fill-color: #262626;
+    margin-block-start: 4px;
+    margin-block-end: 4px;
   }
 
   .botanical {
@@ -283,13 +317,24 @@
     font-style: italic;
   }
 
-  .description {
-    /* desktop: show full text */
-    overflow: visible;
-    cursor: default;
+  .title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
 
-  /* Mobile layout only */
+  .info-button {
+    display: none;
+    font-size: 1.3rem;
+    padding: 10px;
+    cursor: pointer;
+  }
+
+  .description {
+    margin-top: 8px;
+    overflow: visible;
+  }
+
   @media (max-width: 768px) {
     .app-container {
       display: flex;
@@ -303,12 +348,20 @@
       border-bottom: 1px solid #ddd;
       padding: 5px;
       box-sizing: border-box;
-      height: 40%;
+      height: 24%;
     }
 
     .sidebar .recipe-item {
       display: inline-block; /* make horizontal */
       margin-right: 8px;
+    }
+
+    .recipe-item {
+      display: contents !important;
+    }
+
+    .onlymobile {
+      display: none;
     }
 
     .map-area {
@@ -321,7 +374,7 @@
       width: 100%;
       padding: 5px;
       box-sizing: border-box;
-      height: 30%;
+      height: 38%;
       left: 0px !important;
       background-color: rgb(218, 154, 154);
     }
@@ -331,28 +384,16 @@
       margin-right: 8px;
     }
 
+    .info-button {
+      display: inline-block;
+    }
+
+    /* Hide description on mobile unless toggled */
     .description {
-      display: -webkit-box;
-      -webkit-line-clamp: 3; /* truncated on mobile */
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      cursor: pointer;
+      display: none;
     }
-
-    .description.expanded {
-      -webkit-line-clamp: unset; /* expanded state shows full content */
-    }
-
-    .expand-hint::after {
-      content: "[more]";
-      font-weight: bold;
-      color: rgb(218, 154, 154);
-      margin-left: 2px;
-    }
-
-    .description.expanded .expand-hint::after {
-      content: "[less]";
+    .description.show-mobile {
+      display: block;
     }
   }
 </style>

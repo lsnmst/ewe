@@ -4,7 +4,7 @@
   font-weight: 400;
 
   --font-body: "Charis SIL", serif;
-  color: #262626;
+  color: #262626 !important;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
