@@ -107,8 +107,12 @@
 
 {#if loading}
   <div class="loading-overlay">
-    <img src={viteLogo} alt="Loading..." class="loading-icon" />
     <div class="loading-text-container">
+      <h2 id="title">Cosmoscape of the Yoruba plants</h2>
+      <p class="description">
+        {fullDescription}
+      </p>
+      <img src={viteLogo} alt="Loading..." class="loading-icon" />
       <p class="loading-text">Loading the Cosmoscape</p>
       <div class="energy-line">
         <div class="flow"></div>
@@ -251,6 +255,7 @@
     display: inline-block;
     position: relative;
     text-align: center;
+    width: 30%;
   }
 
   .loading-text {
@@ -261,7 +266,7 @@
   .energy-line {
     position: relative;
     height: 2px;
-    width: 100%; 
+    width: 100%;
     background: #ccc;
     border-radius: 2px;
     overflow: hidden;
