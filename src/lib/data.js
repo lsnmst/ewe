@@ -1,4 +1,5 @@
 import Papa from "papaparse";
+import { tsvParse } from "d3-dsv";
 
 // Bounds of your GDAL2Tiles map
 const SW = { lat: -0.004491014968947042, lng: 0.004491014973545032 };
@@ -6,7 +7,6 @@ const NE = { lat: 0.004492137863052166, lng: -0.004492137867650181 };
 const OLD_MIN = -500;
 const OLD_MAX = 500;
 
-// Map old X/Y [-500,500] to tile bounds
 function mapX(oldX) {
   return SW.lng + ((oldX - OLD_MIN) / (OLD_MAX - OLD_MIN)) * (NE.lng - SW.lng);
 }
@@ -32,7 +32,6 @@ export async function loadTSVPapa(url) {
       skipEmptyLines: true,
       complete: (results) => {
         const data = results.data.map((row) => {
-          // Convert X/Y to numbers and map to bounds
           if (row.X) row.X = mapX(parseFloat(row.X));
           if (row.Y) row.Y = mapY(parseFloat(row.Y));
           return row;
@@ -51,14 +50,12 @@ export function mergeRecipeData(recipeRows, plantRows) {
   const grouped = {};
   const plantIndex = {};
 
-  // Build plant lookup
   plantRows.forEach((p) => {
     if (p.ewe_name) {
       plantIndex[p.ewe_name.trim()] = { ...p };
     }
   });
 
-  // Group recipes
   recipeRows.forEach((row) => {
     const key = row.recipe_name?.trim();
     if (!key) return;
@@ -81,24 +78,21 @@ export function mergeRecipeData(recipeRows, plantRows) {
     });
   });
 
-  // Attach full plant details — merge details into top-level so Map can read p.X / p.Y
   Object.values(grouped).forEach((recipe) => {
     recipe.plantDetails = recipe.plants.map((p) => {
       const details = plantIndex[p.ewe_name] || null;
 
       if (details) {
-        // Ensure numeric X/Y at top-level (may already be numbers from loadTSVPapa)
         const X = details.X != null ? Number(details.X) : null;
         const Y = details.Y != null ? Number(details.Y) : null;
-
-        // Keep details copy (without duplicating huge text) but also expose X/Y top-level
         const { X: _dX, Y: _dY, ...restDetails } = details;
+
         return {
-          ...p,          // ewe_name, part
+          ...p,
           X,
           Y,
           details: { ...restDetails, X, Y },
-          ...restDetails // optionally expose common fields (EN_ewe_name, botanical_name, etc.)
+          ...restDetails,
         };
       } else {
         return { ...p, X: null, Y: null, details: null };
@@ -107,4 +101,83 @@ export function mergeRecipeData(recipeRows, plantRows) {
   });
 
   return Object.values(grouped);
+}
+
+// Parse GBIF speciesKey
+function extractSpeciesKey(url) {
+  if (!url) return null;
+  const match = url.match(/species\/(\d+)/);
+  return match ? match[1] : null;
+}
+
+// Fetch herbarium → fallback images
+export async function fetchGBIFImage(speciesKey) {
+  if (!speciesKey) return null;
+
+  const q = (extra = "") =>
+    `https://api.gbif.org/v1/occurrence/search?taxonKey=${speciesKey}&mediaType=StillImage&limit=50${extra}`;
+
+  try {
+    let res = await fetch(q("&basisOfRecord=PRESERVED_SPECIMEN"));
+    let data = await res.json();
+
+    const herb = data.results.find((r) => r.media && r.media.length > 0);
+    if (herb) {
+      return {
+        url: herb.media[0].identifier,
+        thumbnail: herb.media[0].thumbnail || herb.media[0].identifier,
+        source: "herbarium",
+        rights: herb.media[0].license,
+        holder: herb.media[0].rightsHolder,
+        institution: herb.institutionCode,
+      };
+    }
+
+    // fallback
+    res = await fetch(q(""));
+    data = await res.json();
+    const any = data.results.find((r) => r.media && r.media.length > 0);
+    if (any) {
+      return {
+        url: any.media[0].identifier,
+        thumbnail: any.media[0].thumbnail || any.media[0].identifier,
+        source: "other",
+        rights: any.media[0].license,
+        holder: any.media[0].rightsHolder,
+        institution: any.institutionCode,
+      };
+    }
+  } catch (err) {
+    console.warn("GBIF image fetch failed:", err);
+  }
+
+  return null;
+}
+
+// Optional: load + merge TSV data (for convenience)
+export async function loadData() {
+  const plantTsv = await fetch("/plants.tsv").then((r) => r.text());
+  const recipeTsv = await fetch("/recipe.tsv").then((r) => r.text());
+
+  let plants = tsvParse(plantTsv, (d) => ({
+    ...d,
+    X: +d.X,
+    Y: +d.Y,
+    speciesKey: extractSpeciesKey(d.GBIF),
+    gbifImage: null,
+  }));
+
+  const recipes = tsvParse(recipeTsv, (d) => ({
+    ...d,
+    X: +d.X,
+    Y: +d.Y,
+  }));
+
+  for (let plant of plants) {
+    if (plant.speciesKey) {
+      plant.gbifImage = await fetchGBIFImage(plant.speciesKey);
+    }
+  }
+
+  return { plants, recipes };
 }

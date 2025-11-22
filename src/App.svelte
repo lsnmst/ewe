@@ -1,7 +1,9 @@
 <script>
   import { onMount } from "svelte";
+  import viteLogo from "./assets/vite.svg";
   import Map from "./components/Map.svelte";
-  import { mergeRecipeData, loadTSVPapa } from "./lib/data.js";
+  import PlantImage from "./components/PlantImage.svelte";
+  import { mergeRecipeData, loadTSVPapa, fetchGBIFImage } from "./lib/data.js";
 
   let recipes = [];
   let plants = [];
@@ -56,6 +58,17 @@
       const plantRows = await loadTSVPapa(
         import.meta.env.BASE_URL + `plants.tsv?v=${Date.now()}`,
       );
+
+      // Fetch images sequentially (or use Promise.all for parallel)
+      await Promise.all(
+        plantRows.map(async (p) => {
+          const speciesKey = p.GBIF?.match(/species\/(\d+)/)?.[1];
+          if (speciesKey) {
+            p.gbifImage = await fetchGBIFImage(speciesKey);
+          }
+        }),
+      );
+
       recipes = mergeRecipeData(recipeRows, plantRows);
       plants = plantRows;
     } catch (e) {
@@ -93,7 +106,10 @@
 </script>
 
 {#if loading}
-  <p>Loading...</p>
+  <div class="loading-overlay">
+    <img src={viteLogo} alt="Loading..." class="loading-icon" />
+    <p>Loading the Cosmoscape…</p>
+  </div>
 {:else if error}
   <p style="color:red">{error}</p>
 {:else}
@@ -192,6 +208,12 @@
                 >
                   Θ {p.details.ifa_prescription}
                 </span>
+
+                {#if p.details?.gbifImage?.url}
+                  {#key p.details.gbifImage.url}
+                    <PlantImage {p} />
+                  {/key}
+                {/if}
               {:else}
                 <p>No plant details found.</p>
               {/if}
@@ -204,6 +226,33 @@
 {/if}
 
 <style>
+  .loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 100000;
+    font-family: "Charis SIL", serif;
+    color: #262626;
+    text-align: center;
+  }
+
+  .loading-icon {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 12px;
+  }
+
+  .loading-overlay p {
+    font-size: 1rem;
+    font-weight: 500;
+  }
+
   .search-bar {
     position: absolute;
     top: 0;
