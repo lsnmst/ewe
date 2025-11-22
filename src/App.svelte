@@ -108,7 +108,12 @@
 {#if loading}
   <div class="loading-overlay">
     <img src={viteLogo} alt="Loading..." class="loading-icon" />
-    <p>Loading the Cosmoscape…</p>
+    <div class="loading-text-container">
+      <p class="loading-text">Loading the Cosmoscape</p>
+      <div class="energy-line">
+        <div class="flow"></div>
+      </div>
+    </div>
   </div>
 {:else if error}
   <p style="color:red">{error}</p>
@@ -228,29 +233,61 @@
 <style>
   .loading-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
+    inset: 0;
+    background: #ede3e3;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    z-index: 100000;
-    font-family: "Charis SIL", serif;
-    color: #262626;
-    text-align: center;
+    z-index: 9999;
   }
 
   .loading-icon {
     width: 80px;
-    height: 80px;
-    margin-bottom: 12px;
+    margin-bottom: 20px;
   }
 
-  .loading-overlay p {
+  .loading-text-container {
+    display: inline-block;
+    position: relative;
+    text-align: center;
+  }
+
+  .loading-text {
     font-size: 1rem;
-    font-weight: 500;
+    margin: 0;
+  }
+
+  .energy-line {
+    position: relative;
+    height: 2px;
+    width: 100%; 
+    background: #ccc;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 10px;
+  }
+
+  .flow {
+    position: absolute;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      rgba(52, 145, 100, 0) 0%,
+      rgba(83, 152, 78, 0.7) 50%,
+      rgba(218, 154, 154, 0) 100%
+    );
+    animation: moveFlow 1.5s linear infinite;
+  }
+
+  @keyframes moveFlow {
+    0% {
+      left: -50%;
+    }
+    100% {
+      left: 100%;
+    }
   }
 
   .search-bar {

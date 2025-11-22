@@ -121,11 +121,14 @@ export async function fetchGBIFImage(speciesKey) {
     let res = await fetch(q("&basisOfRecord=PRESERVED_SPECIMEN"));
     let data = await res.json();
 
+    function smallGBIFImage(url, width = 400) {
+      return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=${width}&fit=contain`;
+    }
+
     const herb = data.results.find((r) => r.media && r.media.length > 0);
     if (herb) {
       return {
-        url: herb.media[0].identifier,
-        thumbnail: herb.media[0].thumbnail || herb.media[0].identifier,
+        url: smallGBIFImage(herb.media[0].identifier, 400),
         source: "herbarium",
         rights: herb.media[0].license,
         holder: herb.media[0].rightsHolder,
@@ -139,8 +142,7 @@ export async function fetchGBIFImage(speciesKey) {
     const any = data.results.find((r) => r.media && r.media.length > 0);
     if (any) {
       return {
-        url: any.media[0].identifier,
-        thumbnail: any.media[0].thumbnail || any.media[0].identifier,
+        url: smallGBIFImage(any.media[0].identifier, 400),
         source: "other",
         rights: any.media[0].license,
         holder: any.media[0].rightsHolder,
