@@ -16,8 +16,8 @@
 
   let showMobileInfo = false;
 
-  const fullDescription = `The Yoruba cosmoscape is a symbolic cartography where Òrìṣà, energetic
-  fields, and sacred habitats are arranged. In this mapped cosmology,
+  const fullDescription = `The Yoruba cosmoscape is a symbolic cartography 
+  where Òrìṣà, energy fields, and sacred plants interoperate. In this mapped cosmology,
   plant-beings are situated as spatial actors who relate through their
   spiritual affiliation, ritual function, and traditional ecological
   domain/knowledge. Explore the formulae and notice where the plants
@@ -109,7 +109,7 @@
   <div class="loading-overlay">
     <div class="loading-text-container">
       <h2 id="title">Cosmoscape of the Yoruba plants</h2>
-      <p class="description">
+      <p style="font-size: 1em; line-height:1.2em">
         {fullDescription}
       </p>
       <img src={viteLogo} alt="Loading..." class="loading-icon" />
@@ -255,7 +255,7 @@
     display: inline-block;
     position: relative;
     text-align: center;
-    width: 30%;
+    width: 50%;
   }
 
   .loading-text {
@@ -321,7 +321,7 @@
   }
 
   .sidebar {
-    width: 20%;
+    width: 25%;
     overflow-y: auto;
     border-right: 1px solid #ddd;
     padding: 10px;
@@ -427,6 +427,10 @@
   }
 
   @media (max-width: 768px) {
+    .loading-text-container {
+      width: 80%;
+    }
+
     .app-container {
       display: flex;
       flex-direction: column; /* stack vertically */
