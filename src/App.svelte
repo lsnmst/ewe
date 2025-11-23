@@ -32,16 +32,25 @@
     LC: "Least Concern",
   };
 
+  const VALID_IUCN = new Set(["CR", "EN", "VU", "NT", "LC"]);
+
   function getRawIUCN(details) {
     if (!details) return null;
+
     const candidates = [
       details.IUCN,
       details["IUCN "],
       details[" IUCN"],
       details["IUCN  "],
     ];
-    let raw = candidates.find((v) => v && v.trim() !== "");
-    return raw ? raw.trim() : null;
+
+    let raw = candidates.find((v) => typeof v === "string" && v.trim() !== "");
+    if (!raw) return null;
+
+    raw = raw.trim().toUpperCase();
+
+    // accept ONLY clean, exact values
+    return VALID_IUCN.has(raw) ? raw : null;
   }
 
   function getPrettyIUCN(details) {
@@ -76,6 +85,13 @@
     } finally {
       loading = false;
     }
+
+    recipes = recipes.map((r) => ({
+      ...r,
+      hasVulnerable: r.plantDetails.some((p) =>
+        ["VU", "EN", "CR"].includes(getRawIUCN(p.details)),
+      ),
+    }));
   });
 
   $: filteredRecipes = recipes.filter((r) => {
@@ -90,6 +106,12 @@
     );
     return recipeNameMatch || plantMatch;
   });
+
+  $: recipeHasVulnerable = selectedRecipe
+    ? selectedRecipe.plantDetails.some((p) =>
+        ["VU", "EN", "CR"].includes(getRawIUCN(p.details)),
+      )
+    : false;
 
   function selectRecipe(recipe) {
     selectedRecipe = recipe;
@@ -160,6 +182,12 @@
             <h3>{recipe.recipe_name}</h3>
             <h5 class="onlymobile">{recipe.odu}</h5>
             <p class="onlymobile">{recipe.recipe}</p>
+            {#if recipe.hasVulnerable}
+              <div class="vuln-banner onlymobile">
+                <span class="red-dot"></span>
+                At least one of the ingredients in the formula is vulnerable to extinction
+              </div>
+            {/if}
           </button>
         </div>
       {/each}
@@ -187,7 +215,7 @@
             class="close-plant-panel"
             on:click={() => {
               selectedRecipe = null;
-              mapRef?.clearHighlight(); // <-- deselect all markers
+              mapRef?.clearHighlight();
             }}>×</button
           >
           <h3>{selectedRecipe.EN_recipe_name}</h3>
@@ -425,6 +453,26 @@
   .description {
     margin-top: 8px;
     overflow: visible;
+  }
+
+  .vuln-banner {
+    display: flex;
+    align-items: center;
+    color: rgb(218,154,154);
+    border: 1px solid rgb(218,154,154);
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin: 10px 0;
+    font-size: 0.9rem;
+    line-height: 1.1rem;
+  }
+
+  .red-dot {
+    width: 10px;
+    height: 20px;
+    background: rgb(218,154,154);
+    border-radius: 20px;
+    margin-right: 8px;
   }
 
   @media (max-width: 768px) {
