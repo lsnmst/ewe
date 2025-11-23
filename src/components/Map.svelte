@@ -97,6 +97,11 @@
     map.setView([Number(p.Y), Number(p.X)], 19, { animate: true });
   }
 
+  export function clearHighlight() {
+    highlight = null;
+    updateMarkers();
+  }
+
   onMount(() => {
     map = L.map(mapDiv, {
       center: [0, 0],

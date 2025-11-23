@@ -110,53 +110,100 @@ function extractSpeciesKey(url) {
   return match ? match[1] : null;
 }
 
+// GBIF image resizer using images.weserv.nl
+function resizeGBIF(url, size = 400) {
+  if (!url) return null;
+  return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=${size}&h=${size}&fit=contain&we&il`;
+}
+
+// Local storage (7 days)
+
+const CACHE_TTL = 1000 * 60 * 60 * 24 * 7;
+
+function getCache(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+
+    const obj = JSON.parse(raw);
+    if (Date.now() - obj.time > CACHE_TTL) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return obj.data;
+  } catch {
+    return null;
+  }
+}
+
+function setCache(key, data) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ time: Date.now(), data }));
+  } catch { }
+}
+
 // Fetch herbarium → fallback images
 export async function fetchGBIFImage(speciesKey) {
   if (!speciesKey) return null;
 
+  const cacheKey = "gbif_" + speciesKey;
+
+  // 1️⃣ Try cached value first
+  const cached = getCache(cacheKey);
+  if (cached) return cached;
+
+  // 2️⃣ Otherwise fetch from API
   const q = (extra = "") =>
-    `https://api.gbif.org/v1/occurrence/search?taxonKey=${speciesKey}&mediaType=StillImage&limit=50${extra}`;
+    `https://api.gbif.org/v1/occurrence/search?taxonKey=${speciesKey}` +
+    `&mediaType=StillImage&limit=10${extra}`;
 
   try {
+    // Herbarium first
     let res = await fetch(q("&basisOfRecord=PRESERVED_SPECIMEN"));
     let data = await res.json();
 
-    function smallGBIFImage(url, width = 400) {
-      return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=${width}&fit=contain`;
-    }
-
     const herb = data.results.find((r) => r.media && r.media.length > 0);
     if (herb) {
-      return {
-        url: smallGBIFImage(herb.media[0].identifier, 400),
+      const original = herb.media[0].identifier;
+      const result = {
+        url: resizeGBIF(original, 400),
+        full: original,
         source: "herbarium",
         rights: herb.media[0].license,
         holder: herb.media[0].rightsHolder,
         institution: herb.institutionCode,
       };
+      setCache(cacheKey, result);
+      return result;
     }
 
-    // fallback
+    // Fallback: any image
     res = await fetch(q(""));
     data = await res.json();
+
     const any = data.results.find((r) => r.media && r.media.length > 0);
     if (any) {
-      return {
-        url: smallGBIFImage(any.media[0].identifier, 400),
+      const original = any.media[0].identifier;
+      const result = {
+        url: resizeGBIF(original, 400),
+        full: original,
         source: "other",
         rights: any.media[0].license,
         holder: any.media[0].rightsHolder,
         institution: any.institutionCode,
       };
+      setCache(cacheKey, result);
+      return result;
     }
   } catch (err) {
     console.warn("GBIF image fetch failed:", err);
   }
 
+  setCache(cacheKey, null);
   return null;
 }
 
-// Optional: load + merge TSV data (for convenience)
+// Load + merge TSV data
 export async function loadData() {
   const plantTsv = await fetch("/plants.tsv").then((r) => r.text());
   const recipeTsv = await fetch("/recipe.tsv").then((r) => r.text());

@@ -185,10 +185,11 @@
         <div class="plant-panel">
           <button
             class="close-plant-panel"
-            on:click={() => (selectedRecipe = null)}
+            on:click={() => {
+              selectedRecipe = null;
+              mapRef?.clearHighlight(); // <-- deselect all markers
+            }}>×</button
           >
-            ×
-          </button>
           <h3>{selectedRecipe.EN_recipe_name}</h3>
           <p>{selectedRecipe.recipe_EN}</p>
 
