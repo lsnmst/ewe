@@ -3,8 +3,11 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 
 export default defineConfig({
   plugins: [svelte()],
-  base: '/ewe/',
+  base: '/ewe-diaspora/',
   server: {
-    fs: { strict: false }
-  }
+    fs: { strict: false },
+  },
+  optimizeDeps: {
+    include: ['maplibre-gl']
+  },
 });

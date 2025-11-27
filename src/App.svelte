@@ -9,20 +9,18 @@
   let plants = [];
   let highlightName = null;
   let selectedRecipe = null;
+  let mergedRecipes = [];
   let loading = true;
   let error = null;
 
   let searchQuery = "";
-
   let showMobileInfo = false;
+  let mapRef;
 
-  const fullDescription = `The Yoruba cosmoscape is a symbolic cartography 
-  where Òrìṣà, energy fields, and sacred plants interoperate. In this mapped cosmology,
-  plant-beings are situated as spatial actors who relate through their
-  spiritual affiliation, ritual function, and traditional ecological
-  domain/knowledge. Explore the formulae and notice where the plants
-  are located in the cosmoscape, building a new perspective from outside
-  or complementary to Western ethnobotany.`;
+  const fullDescription = `Which Yoruba plant-based formulae can be replicated outside Yorubaland? 
+  This biogeographical map shows where the ingredients of traditional Yoruba formulae coexist in nature.
+  By selecting a recipe, you can discover where at least two ingredients in the formula coexist. 
+  To revive traditional Yoruba knowledge among its diaspora.`;
 
   const IUCN_MAP = {
     VU: "Vulnerable",
@@ -31,32 +29,25 @@
     NT: "Near Threatened",
     LC: "Least Concern",
   };
-
   const VALID_IUCN = new Set(["CR", "EN", "VU", "NT", "LC"]);
 
   function getRawIUCN(details) {
     if (!details) return null;
-
     const candidates = [
       details.IUCN,
       details["IUCN "],
       details[" IUCN"],
       details["IUCN  "],
     ];
-
     let raw = candidates.find((v) => typeof v === "string" && v.trim() !== "");
     if (!raw) return null;
-
     raw = raw.trim().toUpperCase();
-
-    // accept ONLY clean, exact values
     return VALID_IUCN.has(raw) ? raw : null;
   }
 
   function getPrettyIUCN(details) {
     const raw = getRawIUCN(details);
-    if (!raw) return null;
-    return IUCN_MAP[raw] ?? raw;
+    return raw ? (IUCN_MAP[raw] ?? raw) : null;
   }
 
   onMount(async () => {
@@ -68,30 +59,30 @@
         import.meta.env.BASE_URL + `plants.tsv?v=${Date.now()}`,
       );
 
-      // Fetch images sequentially (or use Promise.all for parallel)
+      // fetch GBIF images in parallel
       await Promise.all(
         plantRows.map(async (p) => {
           const speciesKey = p.GBIF?.match(/species\/(\d+)/)?.[1];
-          if (speciesKey) {
-            p.gbifImage = await fetchGBIFImage(speciesKey);
-          }
+          if (speciesKey) p.gbifImage = await fetchGBIFImage(speciesKey);
         }),
       );
 
-      recipes = mergeRecipeData(recipeRows, plantRows);
+      mergedRecipes = mergeRecipeData(recipeRows, plantRows);
       plants = plantRows;
+      recipes = mergedRecipes.map((r) => ({
+        ...r,
+        hasVulnerable: r.plantDetails.some((p) =>
+          ["VU", "EN", "CR"].includes(getRawIUCN(p.details)),
+        ),
+      }));
+      console.log("Loaded recipes:", recipes);
+      console.log("Loaded plants:", plants);
     } catch (e) {
       error = e.message;
+      console.error("Error loading data:", e);
     } finally {
       loading = false;
     }
-
-    recipes = recipes.map((r) => ({
-      ...r,
-      hasVulnerable: r.plantDetails.some((p) =>
-        ["VU", "EN", "CR"].includes(getRawIUCN(p.details)),
-      ),
-    }));
   });
 
   $: filteredRecipes = recipes.filter((r) => {
@@ -107,38 +98,32 @@
     return recipeNameMatch || plantMatch;
   });
 
-  $: recipeHasVulnerable = selectedRecipe
-    ? selectedRecipe.plantDetails.some((p) =>
-        ["VU", "EN", "CR"].includes(getRawIUCN(p.details)),
-      )
-    : false;
-
   function selectRecipe(recipe) {
     selectedRecipe = recipe;
     highlightName = null;
-    if (mapRef) mapRef.zoomToPlants(recipe.plantDetails);
+    if (mapRef) {
+      console.log("selectRecipe:", recipe.recipe_name);
+      mapRef.zoomToRecipe(recipe);
+    }
   }
 
   function selectPlant(p) {
     highlightName = p.ewe_name;
-    if (mapRef) mapRef.zoomToPlant(p);
+    if (mapRef) {
+      console.log("selectPlant:", p.botanical_name);
+      mapRef.zoomToPlant(p);
+    }
   }
-
-  let mapRef;
 </script>
 
 {#if loading}
   <div class="loading-overlay">
     <div class="loading-text-container">
-      <h2 id="title">Cosmoscape of the Yoruba plants</h2>
-      <p style="font-size: 1em; line-height:1.2em">
-        {fullDescription}
-      </p>
+      <h2 id="title">Yoruba Plant Formulae Across the Diaspora</h2>
+      <p>{fullDescription}</p>
       <img src={viteLogo} alt="Loading..." class="loading-icon" />
-      <p class="loading-text">Loading the Cosmoscape</p>
-      <div class="energy-line">
-        <div class="flow"></div>
-      </div>
+      <p class="loading-text">Loading the biogeographic map</p>
+      <div class="energy-line"><div class="flow"></div></div>
     </div>
   </div>
 {:else if error}
@@ -148,27 +133,23 @@
     <div class="search-bar">
       <input
         type="text"
-        placeholder="  Search formulae or plants..."
+        placeholder="   Search formulae or plants..."
         bind:value={searchQuery}
       />
     </div>
 
     <div class="sidebar">
       <div class="title-row">
-        <h2 id="title">Cosmoscape of the Yoruba plants</h2>
-
+        <h2>Yoruba Plant Formulae Across the Diaspora</h2>
         <span
           class="info-button"
-          on:click={() => (showMobileInfo = !showMobileInfo)}
+          on:click={() => (showMobileInfo = !showMobileInfo)}>ⓘ</span
         >
-          ⓘ
-        </span>
       </div>
 
       <p class="description" class:show-mobile={showMobileInfo}>
         {fullDescription}
       </p>
-
       <hr />
 
       <h3>Formulae</h3>
@@ -185,7 +166,7 @@
             {#if recipe.hasVulnerable}
               <div class="vuln-banner onlymobile">
                 <span class="red-dot"></span>
-                At least one of the ingredients in the formula is vulnerable to extinction
+                At least one ingredient is vulnerable to extinction
               </div>
             {/if}
           </button>
@@ -194,7 +175,33 @@
 
       <br /><br />
       <p style="font-size:0.9rem;">
-        <u>Sources:</u><br /><br />
+        <u>Data & Method</u><br /><br />
+        Global native distribution ranges were sourced from Global Biodiversity Information
+        Facility (GBIF) Occurrence Records. Ranges were converted into presence/absence
+        grids and normalized. Species ranges were converted into 0.5° resolution
+        grid cells (approx. 55 km × 55 km). For each formula, coexistence was calculated
+        using: Coexistence = grid cells where ≥2 species occur. Grids were generated
+        using custom processing in Python + GeoPandas, then exported as a simplified
+        GeoJSON coexistence matrix. All coordinates are displayed in WGS84 / EPSG:4326
+        for browser compatibility.<br /><br />
+
+        <u>Critics & Limitations</u><br /><br />
+        The species occurrence records used in this project were obtained from the
+        Global Biodiversity Information Facility (GBIF). Only occurrence points containing
+        valid geographic coordinates were included. Records that were missing coordinates,
+        provided only country-level information, or contained obvious geospatial
+        errors were excluded. Because GBIF relies on contributions from museums,
+        herbaria, institutions, and citizen-science projects, its coverage is inherently
+        uneven across regions and taxa. Some species may therefore be: under-represented
+        due to limited sampling, recorded only in certain countries despite having
+        a wider distribution, present in herbarium collections but lacking digitized
+        or georeferenced data, absent from regions where they exist in the wild simply
+        because no voucher specimens were uploaded. These gaps and inconsistencies
+        may cause missing or incomplete grid cells on the map, particularly for culturally
+        sensible species that are not collected by Western institutions, who monopolize
+        funds and decision-making in research projects.<br /><br />
+
+        <u>Bibliography:</u><br /><br />
         Verger, Pierre Fatumbi (1995). Ewé: o uso das plantas na sociedade iorubá
         <br />Wande Abimbola (1977). Awon Odu Ifá <br />Bolaji Idowu (1962).
         Olódùmarè: God in Yoruba Belief <br />Henry & Margaret Drewal (1983).
@@ -205,9 +212,19 @@
       </p>
     </div>
 
-    <!-- MAP AREA -->
     <div class="map-area">
       <Map bind:this={mapRef} {plants} highlight={highlightName} />
+
+      <div class="legend">
+        <div class="legend-item">
+          <span class="legend-color" style="background:#598dd6;"></span>
+          Coexistence of species belonging to the same formula
+        </div>
+        <div class="legend-item">
+          <span class="legend-color" style="background:#a576e8;"></span>
+          Distribution of the species
+        </div>
+      </div>
 
       {#if selectedRecipe}
         <div class="plant-panel">
@@ -231,22 +248,20 @@
               {#if p.details}
                 <p><b>Energetic Polarity:</b> {p.details.EP}</p>
                 <p><b>Ritual Function:</b> {p.details.ritual_function}</p>
-
                 {#if getPrettyIUCN(p.details)}
                   <p
-                    style="padding:4px; border:1px #262626 solid; padding:5px;border-radius:2px;"
+                    style="padding:5px; border:1px #262626 solid; border-radius:2px;"
                   >
-                    Identified in the IUCN Red List as
-                    <b>{getPrettyIUCN(p.details)}</b>
+                    Identified in the IUCN Red List as <b
+                      >{getPrettyIUCN(p.details)}</b
+                    >
                   </p>
                 {/if}
-
                 <span
                   style="background-color:rgb(218,154,154); padding:5px;border-radius:2px;line-height:2.2rem"
                 >
                   Θ {p.details.ifa_prescription}
                 </span>
-
                 {#if p.details?.gbifImage?.url}
                   {#key p.details.gbifImage.url}
                     <PlantImage {p} />
@@ -405,8 +420,8 @@
     cursor: pointer;
   }
   .plant-card:hover {
-    background: #262626;
-    color: #ede3e3;
+    background: #a576e8;
+    color: #262626;
   }
   .recipe-button {
     width: 100%;
@@ -421,8 +436,8 @@
     cursor: pointer;
   }
   .recipe-button:hover {
-    background: #262626;
-    color: #ede3e3;
+    background: #598dd6;
+    color: #262626;
   }
 
   #title {
@@ -458,8 +473,8 @@
   .vuln-banner {
     display: flex;
     align-items: center;
-    color: rgb(218,154,154);
-    border: 1px solid rgb(218,154,154);
+    color: #262626;
+    border: 1px solid rgb(218, 154, 154);
     padding: 8px 10px;
     border-radius: 6px;
     margin: 10px 0;
@@ -470,9 +485,40 @@
   .red-dot {
     width: 10px;
     height: 20px;
-    background: rgb(218,154,154);
+    background: rgb(218, 154, 154);
     border-radius: 20px;
     margin-right: 8px;
+  }
+
+  .legend {
+    position: absolute;
+    right: 20px;
+    bottom: 20px;
+    background: rgba(243, 213, 213, 1);
+    padding: 12px 16px;
+    border-radius: 5px;
+    z-index: 9999;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0);
+    font-size: 0.8rem;
+    line-height: 1.2;
+    width: 220px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    margin: 4px 0;
+    color: #444;
+  }
+
+  .legend-color {
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-right: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
   }
 
   @media (max-width: 768px) {
@@ -538,6 +584,10 @@
     }
     .description.show-mobile {
       display: block;
+    }
+
+    .legend {
+      bottom: 60px;
     }
   }
 </style>

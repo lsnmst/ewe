@@ -1,0 +1,7 @@
+pygbif 
+geopandas 
+shapely 
+pandas 
+tqdm 
+pyproj 
+rtree

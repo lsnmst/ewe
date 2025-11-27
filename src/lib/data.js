@@ -229,4 +229,4 @@ export async function loadData() {
   }
 
   return { plants, recipes };
-}
+} 

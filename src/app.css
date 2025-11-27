@@ -110,6 +110,10 @@ button:focus-visible {
   display: none;
 }
 
+.maplibregl-ctrl-attrib-inner {
+  display: none;
+}
+
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;

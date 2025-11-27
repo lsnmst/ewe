@@ -1,168 +1,236 @@
 <script>
-  import { onMount, onDestroy } from "svelte";
-  import L from "leaflet";
-  import "leaflet/dist/leaflet.css";
-  import "leaflet-minimap";
-  import "leaflet-minimap/dist/Control.MiniMap.min.css";
+  import { onMount } from "svelte";
+  import maplibregl from "maplibre-gl";
+  import "maplibre-gl/dist/maplibre-gl.css";
 
   export let plants = [];
-  export let highlight = null; // now can be string or array
+  export let highlight = null;
 
-  let mapDiv;
   let map;
-  let markersMap = new Map();
+  let container;
+  let coexistenceData = [];
 
-  const MAP_BOUNDS = [
-    [-0.004491014968947042, 0.004491014973545032],
-    [0.004492137863052166, -0.004492137867650181],
-  ];
+  // Grid size
+  export let CELL_SIZE = 0.5;
 
-  const TILE_URL =
-    "https://www.alessandromusetta.com/geo/tiles/ewe/carto/{z}/{x}/{y}.png";
-  const TILE_MINIMAP_URL =
-    "https://www.alessandromusetta.com/geo/tiles/ewe/myth/{z}/{x}/{y}.png";
+  // Initial overlay message visible
+  let emptyState = true;
 
-  const normalIcon = L.divIcon({
-    className: "custom-marker",
-    html: `<svg width="12" height="12" viewBox="0 0 12 12">
-            <circle cx="6" cy="6" r="5" fill="#ede3e3" stroke="#000000" stroke-width="2"/>
-           </svg>`,
-    iconSize: [10, 10],
-    iconAnchor: [5, 5],
-  });
+  // --- UTILITIES ---
+  function normalize(str) {
+    return str
+      ?.normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim();
+  }
 
-  const highlightIcon = L.divIcon({
-    className: "custom-marker",
-    html: `
-      <svg width="32" height="32" viewBox="0 0 32 32">
-      <circle cx="16" cy="16" r="12" fill="#da9a9a" stroke="#fff" stroke-width="2"/>
-      <line x1="10" y1="10" x2="22" y2="22" stroke="#262626" stroke-width="3" stroke-linecap="round"/>
-      <line x1="22" y1="10" x2="10" y2="22" stroke="#262626" stroke-width="3" stroke-linecap="round"/>
-      </svg>           
-    `,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-  });
+  function gridToPolygon(key) {
+    const [gx, gy] = key.split(":").map(Number);
 
-  function updateMarkers() {
+    // SAFE coordinates
+    const minLng = Math.max(-180, Math.min(180, gx * CELL_SIZE));
+    const maxLng = Math.max(-180, Math.min(180, (gx + 1) * CELL_SIZE));
+    const minLat = Math.max(-90, Math.min(90, gy * CELL_SIZE));
+    const maxLat = Math.max(-90, Math.min(90, (gy + 1) * CELL_SIZE));
+
+    return [
+      [
+        [minLng, minLat],
+        [maxLng, minLat],
+        [maxLng, maxLat],
+        [minLng, maxLat],
+        [minLng, minLat],
+      ],
+    ];
+  }
+
+  function clearGrid() {
+    if (map?.getSource("grid-cells")) {
+      map.getSource("grid-cells").setData({
+        type: "FeatureCollection",
+        features: [],
+      });
+    }
+  }
+
+  function drawGridCells(cellKeys, color, outline = "#000") {
+    if (!map || !cellKeys?.length) return;
+
+    const features = cellKeys.map((key) => ({
+      type: "Feature",
+      geometry: { type: "Polygon", coordinates: gridToPolygon(key) },
+      properties: { color, outline, opacity: 0.75 },
+    }));
+
+    if (map.getSource("grid-cells")) {
+      map.getSource("grid-cells").setData({
+        type: "FeatureCollection",
+        features,
+      });
+    } else {
+      map.addSource("grid-cells", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features },
+      });
+
+      map.addLayer({
+        id: "grid-cells-fill",
+        type: "fill",
+        source: "grid-cells",
+        paint: {
+          "fill-color": ["get", "color"],
+          "fill-opacity": 0.75,
+        },
+      });
+
+      map.addLayer({
+        id: "grid-cells-outline",
+        type: "line",
+        source: "grid-cells",
+        paint: {
+          "line-color": ["get", "outline"],
+          "line-width": 4,
+          "line-opacity": 0.75,
+        },
+      });
+    }
+  }
+
+  function resetMapView() {
     if (!map) return;
+    map.jumpTo({ center: [0, 0], zoom: 1 });
+  }
 
-    const highlightArray = Array.isArray(highlight)
-      ? highlight
-      : highlight
-        ? [highlight]
-        : [];
+  function zoomToCells(cellKeys) {
+    if (!map || !cellKeys?.length) return;
 
-    plants.forEach((p, i) => {
-      if (p.X == null || p.Y == null) return;
+    const latitudes = [];
+    const longitudes = [];
 
-      const lat = parseFloat(p.Y);
-      const lng = parseFloat(p.X);
-      const key = `${p.ewe_name}-${p.part}-${i}`;
-      let marker = markersMap.get(key);
-      const isHighlighted = highlightArray.includes(p.ewe_name);
+    cellKeys.forEach((key) => {
+      const [gx, gy] = key.split(":").map(Number);
 
-      if (!marker) {
-        marker = L.marker([lat, lng], {
-          icon: isHighlighted ? highlightIcon : normalIcon,
-        })
-          .addTo(map)
-          .bindPopup(`<b>${p.ewe_name}</b>`);
-        markersMap.set(key, marker);
-      } else {
-        marker.setIcon(isHighlighted ? highlightIcon : normalIcon);
-      }
+      longitudes.push(gx * CELL_SIZE, (gx + 1) * CELL_SIZE);
+      latitudes.push(gy * CELL_SIZE, (gy + 1) * CELL_SIZE);
     });
+
+    const minLng = Math.min(...longitudes);
+    const maxLng = Math.max(...longitudes);
+    const minLat = Math.min(...latitudes);
+    const maxLat = Math.max(...latitudes);
+
+    // Avoid out-of-range bounds (lat must be -90 to 90)
+    if (minLat < -90 || maxLat > 90) return;
+
+    map.fitBounds(
+      [
+        [minLng, minLat],
+        [maxLng, maxLat],
+      ],
+      {
+        padding: {
+          top: 40,
+          bottom: 40,
+          left: 400,
+          right: 40,
+        },
+      },
+    );
   }
 
-  export function zoomToPlants(plantsArray) {
-    if (!map || !plantsArray?.length) return;
-
-    const latlngs = plantsArray
-      .filter((p) => p.X != null && p.Y != null)
-      .map((p) => [Number(p.Y), Number(p.X)]);
-
-    if (!latlngs.length) return;
-
-    // set highlight to all plants in this recipe
-    highlight = plantsArray.map((p) => p.ewe_name);
-
-    const bounds = L.latLngBounds(latlngs);
-    map.fitBounds(bounds, { padding: [50, 50] });
+  // --- LOAD JSON ---
+  async function loadCoexistence() {
+    try {
+      const url = import.meta.env.BASE_URL + "coexistence_geo.json";
+      const res = await fetch(url);
+      coexistenceData = await res.json();
+    } catch (err) {
+      console.error("Error loading coexistence JSON:", err);
+    }
   }
 
-  export function zoomToPlant(p) {
-    if (!map || p.X == null || p.Y == null) return;
-    highlight = p.ewe_name; // single highlight
-    map.setView([Number(p.Y), Number(p.X)], 19, { animate: true });
+  // --- PUBLIC API ---
+  export function zoomToRecipe(recipe) {
+    emptyState = false;
+    clearGrid();
+    resetMapView();
+
+    const recipeName = normalize(recipe.recipe_name);
+    const entry = coexistenceData.find((f) => normalize(f.name) === recipeName);
+    if (!entry) return;
+
+    drawGridCells(entry.strict_cells, "red", "#000");
+    drawGridCells(entry.relaxed_cells, "#598dd6", "#598dd6");
+
+    zoomToCells([...entry.strict_cells, ...entry.relaxed_cells]);
+  }
+
+  export function zoomToPlant(plant) {
+    emptyState = false;
+    clearGrid();
+    resetMapView();
+
+    const entry = coexistenceData.find((f) =>
+      Object.keys(f.species_layers || {}).some(
+        (k) => normalize(k) === normalize(plant.botanical_name),
+      ),
+    );
+
+    if (!entry) return;
+
+    const cells = entry.species_layers[plant.botanical_name] || [];
+    drawGridCells(cells, "#a576e8", "#a576e8");
+    zoomToCells(cells);
   }
 
   export function clearHighlight() {
-    highlight = null;
-    updateMarkers();
+    emptyState = true;
+    clearGrid();
   }
 
-  onMount(() => {
-    map = L.map(mapDiv, {
+  // --- INIT MAP ---
+  onMount(async () => {
+    await loadCoexistence();
+
+    map = new maplibregl.Map({
+      container,
+      style: import.meta.env.BASE_URL + "mapstyle.json",
       center: [0, 0],
-      zoom: 20,
-      minZoom: 16,
-      maxZoom: 20,
-      zoomControl: false,
+      zoom: 1,
     });
 
-    L.tileLayer(TILE_URL, {
-      tms: true,
-      noWrap: true,
-      minZoom: 16,
-      maxZoom: 20,
-    }).addTo(map);
-
-    map.fitBounds(MAP_BOUNDS);
-
-    const miniLayer = L.tileLayer(TILE_MINIMAP_URL, {
-      tms: true,
-      noWrap: true,
-      minZoom: 0,
-      maxZoom: 20,
-    });
-
-    new L.Control.MiniMap(miniLayer, {
-      toggleDisplay: true,
-      minimized: false,
-      zoomLevelOffset: -2,
-      width: 200,
-      height: 200,
-      aimingRectOptions: {
-        color: "#ede3e3",
-        weight: 1,
-        fill: false,
-      },
-    }).addTo(map);
-
-    L.control.zoom({ position: "topleft" }).addTo(map);
-
-    updateMarkers();
+    map.addControl(new maplibregl.NavigationControl(), "top-right");
   });
-
-  $: if (map && plants.length && markersMap.size === 0) {
-    updateMarkers();
-  }
-  $: if (map && highlight) updateMarkers();
-
-  onDestroy(() => map?.remove());
 </script>
 
-<div bind:this={mapDiv} class="map-container"></div>
+<div bind:this={container} class="map-container"></div>
+
+{#if emptyState}
+  <div class="overlay-message">
+    Select a formula to display its biogeographic grid
+  </div>
+{/if}
 
 <style>
   .map-container {
     width: 100%;
     height: 100%;
-    min-height: 500px;
-    background-color: #262626;
   }
-  .custom-marker {
-    pointer-events: auto;
+
+  .overlay-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(243, 213, 213, 1);
+    padding: 20px 30px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    text-align: center;
+    max-width: 200px;
+    z-index: 9999;
+    box-shadow: 0 4px 14px rgba(218, 154, 154, 0.2);
+    color: #262626;
+    user-select: none;
   }
 </style>

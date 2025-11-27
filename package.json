@@ -1,6 +1,6 @@
 {
-  "homepage": "https://lsnmst.github.io/ewe",
-  "name": "ewe",
+  "homepage": "https://lsnmst.github.io/ewe-diaspora",
+  "name": "ewe-diaspora",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -21,6 +21,7 @@
     "d3-dsv": "^3.0.1",
     "leaflet": "^1.9.4",
     "leaflet-minimap": "^3.6.1",
+    "maplibre-gl": "^2.4.0",
     "papaparse": "^5.5.3"
   }
 }
